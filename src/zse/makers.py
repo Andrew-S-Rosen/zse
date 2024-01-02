@@ -153,7 +153,7 @@ def make_with_ratio(
 
     # Calculate the number of heteroatoms to add
     n_Si = len([atom for atom in iza_zeolite if atom.symbol == "Si"])
-    n_heteroatoms_target = round(n_Si / ratio)
+    n_heteroatoms_target = round(n_Si / (1 + ratio))
 
     zeolites = []
     with tqdm(total=max_samples, desc="Generating zeolites", unit="item") as pbar:
