@@ -151,9 +151,11 @@ def monovalent(
         return traj, locations
     else:
         clean_traj = []
-        for atoms in traj:
+        clean_locations = []
+        for i, atoms in enumerate(traj):
             is_clashing = check_clashes(atoms, len(atoms) - 1, cutoff=cutoff)
             if not is_clashing:
                 clean_traj.append(atoms)
+                clean_locations.append(locations[i])
 
-        return clean_traj, locations
+        return clean_traj, clean_locations

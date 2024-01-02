@@ -155,9 +155,12 @@ def make_with_ratio(
             for _ in range(n_heteroatoms_target):
                 d_min = 0.0
                 while d_min is not np.nan and d_min <= min_heteroatom_distance:
-                    _, T_indices = random.choice(list(T_info.items()))
-                    T_index = random.choice(T_indices)
                     zeolite_ = deepcopy(zeolite)
+                    _, T_indices = random.choice(list(T_info.items()))
+                    valid_T_indices = [
+                        idx for idx in T_indices if zeolite_[idx].symbol != heteroatom
+                    ]
+                    T_index = random.choice(valid_T_indices)
                     zeolite_ = tsub(zeolite_, T_index, heteroatom)
                     d_min = get_min_heteroatom_distance(zeolite_, heteroatom)
 
