@@ -11,7 +11,7 @@ from tqdm import tqdm
 from zse.cation import monovalent
 from zse.collections.framework import get_framework
 from zse.substitute import tsub
-from zse.t_utilities import get_min_heteroatom_distance, get_T_info
+from zse.t_utilities import get_T_info, get_T_info_exchangeable
 from zse.utilities import get_unique_structures, site_labels
 
 if TYPE_CHECKING:
@@ -140,43 +140,63 @@ def make_with_ratio(
         list of all exchanged zeolites
     """
 
-    iza_zeolite = make_iza_zeolite(code)
-    T_info = get_T_info(iza_zeolite, code)
-    n_Si = len([atom for atom in iza_zeolite if atom.symbol == "Si"])
-    n_heteroatoms_target = round(n_Si / ratio)
-
+    # Set defaults
     if min_heteroatom_distance is None:
         min_heteroatom_distance = 0.0
     if min_cation_distance is None:
         min_cation_distance = 0.0
 
+    # Make the Si zeolite and get T site labels/indices
+    iza_zeolite = make_iza_zeolite(code)
+    T_info = get_T_info(iza_zeolite, code)
+
+    # Calculate the number of heteroatoms to add
+    n_Si = len([atom for atom in iza_zeolite if atom.symbol == "Si"])
+    n_heteroatoms_target = round(n_Si / ratio)
+
     zeolites = []
     with tqdm(total=max_samples, desc="Generating zeolites", unit="item") as pbar:
+        # Generate zeolites until we have enough
         while len(zeolites) < max_samples:
             zeolite = deepcopy(iza_zeolite)
             bad_zeolite = False
-            for _ in range(n_heteroatoms_target):
-                d_min = 0.0
-                while d_min is not np.nan and d_min <= min_heteroatom_distance:
-                    zeolite_ = deepcopy(zeolite)
-                    _, T_indices = random.choice(list(T_info.items()))
-                    valid_T_indices = [
-                        idx for idx in T_indices if zeolite_[idx].symbol != heteroatom
-                    ]
-                    T_index = random.choice(valid_T_indices)
-                    zeolite_ = tsub(zeolite_, T_index, heteroatom)
-                    d_min = get_min_heteroatom_distance(zeolite_, heteroatom)
 
-                zeolite = zeolite_
+            # Add heteroatoms until we reach the target ratio
+            for _ in range(n_heteroatoms_target):
+                # Get only the valid T sites to consider for exchange
+                T_info_valid = get_T_info_exchangeable(
+                    T_info,
+                    zeolite,
+                    heteroatom,
+                    min_heteroatom_distance=min_heteroatom_distance,
+                )
+                if not T_info_valid:
+                    bad_zeolite = True
+                    break
+
+                # Pick a random T site label and get the corresponding indices
+                _, T_indices = random.choice(list(T_info_valid.items()))
+
+                # Pick a random T site from the list of T sites with that label
+                T_index = random.choice(T_indices)
+
+                # Substitute the T site with the heteroatom
+                zeolite = tsub(zeolite, T_index, heteroatom)
+
+                # Charge balance if a cation is specified
                 if cation:
+                    # Get charge-balanced zeolites with the cation at various adsorption sites
                     balanced_zeolites, _ = monovalent(
                         zeolite, T_index, cation, cutoff=min_cation_distance
                     )
                     if not balanced_zeolites:
                         bad_zeolite = True
                         break
+
+                    # Pick a random charge-balanced zeolite
                     zeolite = random.choice(balanced_zeolites)
 
+            # Add the zeolite to the list
             if not bad_zeolite and zeolite not in zeolites:
                 zeolites.append(zeolite)
                 pbar.update(1)

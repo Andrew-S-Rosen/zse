@@ -1,6 +1,7 @@
 """Get info about T sites in a zeolite."""
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -64,3 +65,38 @@ def get_min_T_distance(atoms: Atoms, T_symbols: str | list[str] = "Al") -> float
         heteroatom_positions = atoms[heteroatom_sites].get_all_distances(mic=True)
         return np.min(heteroatom_positions[heteroatom_positions > 0])
     return np.inf
+
+
+def get_T_info_exchangeable(
+    T_info: dict,
+    zeolite: Atoms,
+    heteroatom: str,
+    min_heteroatom_distance: float | None = None,
+) -> dict | None:
+    """
+    Convert a T_info dictionary from get_T_info() to only include T sites that are
+    exchangeable with the given heteroatom. This is based on:
+
+    1. The T site index not already being the heteroatom
+    2. The T site index being far enough away from any other heteroatom (optional)
+    """
+    if min_heteroatom_distance is None:
+        min_heteroatom_distance = 0.0
+
+    T_info_copy = deepcopy(T_info)
+    for T_label, T_indices in T_info.items():
+        for T_index in T_indices:
+            heteroatom_indices = [
+                atom.index
+                for atom in zeolite
+                if atom.symbol == heteroatom and atom.index != T_index
+            ]
+            if not heteroatom_indices:
+                continue
+            dist_mat = zeolite.get_distances(T_index, heteroatom_indices, mic=True)
+            d_min = np.min(dist_mat)
+            if zeolite[T_index].symbol == heteroatom or d_min < min_heteroatom_distance:
+                T_info_copy[T_label].remove(T_index)
+        if not T_info_copy[T_label]:
+            del T_info_copy[T_label]
+    return T_info_copy
