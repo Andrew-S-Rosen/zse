@@ -144,8 +144,8 @@ def make_with_ratio(
     # Set defaults
     if min_heteroatom_distance is None:
         min_heteroatom_distance = 0.0
-    if min_cation_distance is None:
-        min_cation_distance = 0.0
+    if min_interatomic_distance is None:
+        min_interatomic_distance = 0.0
 
     # Make the Si zeolite and get T site labels/indices
     iza_zeolite = make_iza_zeolite(code)
