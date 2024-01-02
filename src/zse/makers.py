@@ -125,9 +125,12 @@ def make_with_ratio(
         Maximum number of zeolites to generate, by default 50
     min_cation_distance : float, optional
         Minimum allowable interatomic distance between the placed cation
-        and any other atom, by default 1.5 A.
+        and any other atom, by default 1.5 A. This is used to prevent
+        clashing.
     min_heteroatom_distance : float, optional
         Minimum allowable distance between heteroatoms, by default 3.5 A.
+        This can be used to prevent Al-O-Al bridges. Set to `None` if
+        heteroatom-O-heteroatom bridges are not an issue.
     deduplicate : bool, optional
         Whether to remove duplicate zeolites at the end, by default True
 
