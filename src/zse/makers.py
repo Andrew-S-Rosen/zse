@@ -23,6 +23,16 @@ def make_iza_zeolite(code: str) -> Atoms:
     Make an idealized zeolite from an IZA code, populate the atoms.info
     dictionary with the framework name, and add a labels array to the
     atoms object.
+
+    Parameters
+    ----------
+    code : str
+        IZA code of the zeolite to make
+
+    Returns
+    -------
+    Atoms
+        Atoms object of the zeolite
     """
     zeolite = get_framework(code)
     labels = site_labels(zeolite, code)
@@ -42,6 +52,20 @@ def make_all_exchanged_zeolites(
 
     Limitations:
     - Only supports monovalent cations currently.
+
+    Parameters
+    ----------
+    code : str
+        IZA code of the zeolite to make
+    heteroatom : str
+        heteroatom to substitute
+    cation : str, optional
+        cation to charge balance with, by default None
+
+    Returns
+    -------
+    list[Atoms]
+        list of all exchanged zeolites
     """
 
     zeolite = make_iza_zeolite(code)
@@ -81,6 +105,29 @@ def make_with_ratio(
     in one of the possible, adjacent adsorption sites.
     6. Repeat Steps 2-5 until the desired Si:heteroatom ratio is achieved.
     7. Repeat steps 2-6 until `max_samples` zeolites have been generated.
+
+    Limitations:
+    - Only supports monovalent cations currently.
+
+    Parameters
+    ----------
+    code : str
+        IZA code of the zeolite to make
+    ratio : float
+        Desired Si:heteroatom ratio
+    heteroatom : str, optional
+        Heteroatom to substitute, by default "Al"
+    cation : str, optional
+        Cation to charge balance with, by default None
+    max_samples : int, optional
+        Maximum number of zeolites to generate, by default 50
+    deduplicate : bool, optional
+        Whether to remove duplicate zeolites at the end, by default True
+
+    Returns
+    -------
+    list[Atoms]
+        list of all exchanged zeolites
     """
 
     iza_zeolite = make_iza_zeolite(code)
