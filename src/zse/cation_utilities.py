@@ -69,3 +69,17 @@ def add_cation(
                     sort=True,
                 )
     return traj, locations
+
+
+def check_clashes(atoms: Atoms, index: int, cutoff: float = 1.5) -> bool:
+    """
+    This function will check if an atom is too close to another atom in the
+    atoms object. If it is, it will return True, otherwise it will return
+    False.
+    """
+    min_dist = np.min(
+        atoms.get_distances(
+            index, [atom.index for atom in atoms if atom.index != index], mic=True
+        )
+    )
+    return True if min_dist < cutoff else False

@@ -7,7 +7,7 @@ from ase import Atoms
 from ase.data import chemical_symbols, covalent_radii
 from ase.io import write
 
-from zse.cation_utilities import add_cation, count_rings
+from zse.cation_utilities import add_cation, check_clashes, count_rings
 from zse.rings import get_rings
 from zse.utilities import center
 
@@ -79,7 +79,15 @@ def divalent(atoms, M, path=None):
     return traj
 
 
-def monovalent(atoms, index, symbol, included_rings=None, path=None, bvect=None):
+def monovalent(
+    atoms,
+    index,
+    symbol,
+    included_rings=None,
+    path=None,
+    bvect=None,
+    cutoff: float | None = 1.5,
+):
     """
     This code has been updated to place the ion inside each of the rings
     associated with the T site. The rings are found using the rings module of
@@ -138,4 +146,14 @@ def monovalent(atoms, index, symbol, included_rings=None, path=None, bvect=None)
         bvect,
     )
 
-    return traj, locations
+    # Check for overlapping atoms
+    if cutoff is None:
+        return traj, locations
+    else:
+        clean_traj = []
+        for atoms in traj:
+            is_clashing = check_clashes(atoms, len(atoms) - 1, cutoff=cutoff)
+            if not is_clashing:
+                clean_traj.append(atoms)
+
+        return clean_traj, locations

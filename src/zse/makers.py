@@ -11,7 +11,7 @@ from tqdm import tqdm
 from zse.cation import monovalent
 from zse.collections.framework import get_framework
 from zse.substitute import tsub
-from zse.t_utilities import get_T_info
+from zse.t_utilities import get_min_heteroatom_distance, get_T_info
 from zse.utilities import get_unique_structures, site_labels
 
 if TYPE_CHECKING:
@@ -90,6 +90,8 @@ def make_with_ratio(
     heteroatom: str = "Al",
     cation: str | None = None,
     max_samples: int = 50,
+    min_cation_distance: float | None = 1.5,
+    min_heteroatom_distance: float | None = 3.5,
     deduplicate: bool = True,
 ) -> list[Atoms]:
     """
@@ -121,6 +123,11 @@ def make_with_ratio(
         Cation to charge balance with, by default None
     max_samples : int, optional
         Maximum number of zeolites to generate, by default 50
+    min_cation_distance : float, optional
+        Minimum allowable interatomic distance between the placed cation
+        and any other atom, by default 1.5 A.
+    min_heteroatom_distance : float, optional
+        Minimum allowable distance between heteroatoms, by default 3.5 A.
     deduplicate : bool, optional
         Whether to remove duplicate zeolites at the end, by default True
 
@@ -135,26 +142,37 @@ def make_with_ratio(
     n_Si = len([atom for atom in iza_zeolite if atom.symbol == "Si"])
     n_heteroatoms_target = round(n_Si / ratio)
 
+    if min_heteroatom_distance is None:
+        min_heteroatom_distance = 0.0
+    if min_cation_distance is None:
+        min_cation_distance = 0.0
+
     zeolites = []
     with tqdm(total=max_samples, desc="Generating zeolites:", unit="item") as pbar:
         while len(zeolites) < max_samples:
             zeolite = deepcopy(iza_zeolite)
-            n_heteroatoms = 0
-            while n_heteroatoms < n_heteroatoms_target:
-                _, T_indices = random.choice(list(T_info.items()))
-                T_index = random.choice(T_indices)
-                zeolite = tsub(zeolite, T_index, heteroatom)
+            bad_zeolite = False
+            for _ in range(n_heteroatoms_target):
+                d_min = 0.0
+                while d_min is not np.nan and d_min <= min_heteroatom_distance:
+                    _, T_indices = random.choice(list(T_info.items()))
+                    T_index = random.choice(T_indices)
+                    zeolite_ = deepcopy(zeolite)
+                    zeolite_ = tsub(zeolite_, T_index, heteroatom)
+                    d_min = get_min_heteroatom_distance(zeolite_, heteroatom)
+
+                zeolite = zeolite_
                 if cation:
-                    zeolite = random.choice(monovalent(zeolite, T_index, cation)[0])
-                n_heteroatoms = len(
-                    [atom for atom in zeolite if atom.symbol == heteroatom]
-                )
+                    balanced_zeolites, _ = monovalent(
+                        zeolite, T_index, cation, cutoff=min_cation_distance
+                    )
+                    if not balanced_zeolites:
+                        bad_zeolite = True
+                        break
+                    zeolite = random.choice(balanced_zeolites)
 
-            if zeolite not in zeolites:
+            if not bad_zeolite and zeolite not in zeolites:
                 zeolites.append(zeolite)
-            pbar.update(1)
+                pbar.update(1)
 
-    if deduplicate:
-        return get_unique_structures(zeolites)
-    else:
-        return zeolites
+    return get_unique_structures(zeolites) if deduplicate else zeolites

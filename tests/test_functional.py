@@ -37,3 +37,21 @@ def test_make_with_ratio():
         "CHA", 10.0, heteroatom="B", cation="Na", max_samples=2, deduplicate=False
     )
     assert len(exchanged_zeolites) == 2
+    assert len([atom for atom in exchanged_zeolites[0] if atom.symbol == "Na"]) == 4
+    assert len([atom for atom in exchanged_zeolites[0] if atom.symbol == "B"]) == 4
+    assert len([atom for atom in exchanged_zeolites[-1] if atom.symbol == "Na"]) == 4
+    assert len([atom for atom in exchanged_zeolites[-1] if atom.symbol == "B"]) == 4
+
+
+def test_make_with_ratio2():
+    exchanged_zeolites = make_with_ratio(
+        "CHA",
+        4.0,
+        heteroatom="B",
+        cation="Na",
+        max_samples=2,
+        deduplicate=False,
+        min_heteroatom_distance=None,
+        min_cation_distance=None,
+    )
+    assert len(exchanged_zeolites) == 2
