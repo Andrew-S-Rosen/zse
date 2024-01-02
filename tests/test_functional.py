@@ -3,7 +3,7 @@ from pathlib import Path
 from ase.io import read
 from numpy.testing import assert_array_almost_equal, assert_array_equal
 
-from zse.makers import make_all_exchanged_zeolites, make_iza_zeolite
+from zse.makers import make_all_exchanged_zeolites, make_iza_zeolite, make_with_ratio
 
 REF_DATA = Path(__file__).parent / Path("data")
 
@@ -30,3 +30,10 @@ def test_exchange_unique_cha():
 def test_exchange_unique_mor():
     exchanged_zeolites = make_all_exchanged_zeolites("MOR", "B", "Na")
     assert len(exchanged_zeolites) == 26
+
+
+def test_make_with_ratio():
+    exchanged_zeolites = make_with_ratio(
+        "CHA", 10.0, heteroatom="B", cation="Na", max_samples=2, deduplicate=False
+    )
+    assert len(exchanged_zeolites) == 2

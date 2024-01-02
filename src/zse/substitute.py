@@ -5,8 +5,6 @@ from copy import deepcopy
 from ase import neighborlist
 from ase.build import molecule
 
-from zse.t_utilities import get_ratio
-
 
 def tsub(atoms, index, new_atom):
     """
@@ -22,11 +20,6 @@ def tsub(atoms, index, new_atom):
         symbols[i] = new_atom
 
     z.set_chemical_symbols(symbols)
-    z.info["Si_heteroatom_ratio"] = get_ratio(z, new_atom)
-    if "heteroatoms" not in z.info:
-        z.info["heteroatoms"] = {"indices": [], "symbols": []}
-    z.info["heteroatoms"]["indices"].extend(index)
-    z.info["heteroatoms"]["symbols"].extend([new_atom] * len(index))
 
     return z
 

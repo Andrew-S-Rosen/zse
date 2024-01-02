@@ -28,26 +28,24 @@ def make_iza_zeolite(code: str) -> Atoms:
     labels = site_labels(zeolite, code)
     zeolite.set_array("labels", np.array(list(labels.values())))
     zeolite.info["framework"] = code
+    zeolite.info["T_info"] = get_T_info(zeolite, code)
     return zeolite
 
 
 def make_all_exchanged_zeolites(
-    code: str,
-    heteroatom: str,
-    cation: str | None = None,
-    ignored_T_indices: list[int] | None = None,
+    code: str, heteroatom: str, cation: str | None = None
 ) -> list[Atoms]:
     """
     Enumerate all unique T sites and, for each, exchange a single Si atom with a heteroatom.
     Each is optionally charge balanced with the specified cation, and all heteratom-cation configurations
-    are returned. Indices in `ignored_T_indices` will not be substituted.
+    are returned.
 
     Limitations:
     - Only supports monovalent cations currently.
     """
 
     zeolite = make_iza_zeolite(code)
-    T_info = get_T_info(zeolite, code, ignored_T_indices=ignored_T_indices)
+    T_info = get_T_info(zeolite, code)
 
     zeolites = []
     for _, T_indices in T_info.items():
@@ -68,13 +66,11 @@ def make_with_ratio(
     heteroatom: str = "Al",
     cation: str | None = None,
     max_samples: int = 50,
-    ignored_T_indices: list[int] | None = None,
     deduplicate: bool = True,
 ) -> list[Atoms]:
     """
     Make exchanged zeolites with a specified Si:heteroatom ratio. If a cation is specified,
     the zeolite will be charge balanced. Up to `max_samples` zeolites will be returned.
-    Indices in `ignored_T_indices` will not be substituted.
 
     Method:
     1. Enumerate all unique T labels and their corresponding sites.
@@ -87,10 +83,8 @@ def make_with_ratio(
     7. Repeat steps 2-6 until `max_samples` zeolites have been generated.
     """
 
-    # TODO: ignored_T_indices --> allowed_T_symbols
-
     iza_zeolite = make_iza_zeolite(code)
-    T_info = get_T_info(iza_zeolite, code, ignored_T_indices=ignored_T_indices)
+    T_info = get_T_info(iza_zeolite, code)
     n_Si = len([atom for atom in iza_zeolite if atom.symbol == "Si"])
     n_heteroatoms_target = round(n_Si / ratio)
 

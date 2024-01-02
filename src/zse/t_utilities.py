@@ -27,24 +27,17 @@ def get_T_info(
     """
     Get T-site info for a zeolite. Returns a dictionary of the form
     {"T1": [0, 1], "T2": [1, 2], ...} where the keys are the T-site labels and the values
-    are the indices of the T-site in the zeolite. If ignored_indices is
-    specified, then these will be excluded from the returned indices.
+    are the indices of the T-site in the zeolite.
     """
-    ignored_T_indices = ignored_T_indices or []
 
     labels = list(site_labels(zeolite, code).values())
     unique_T_labels = np.unique([T for T in labels if "T" in T]).tolist()
     T_info = {}
 
     for T_label in unique_T_labels:
-        T_indices = [
-            i
-            for i, label in enumerate(labels)
-            if label == T_label and i not in ignored_T_indices
-        ]
+        T_indices = [i for i, label in enumerate(labels) if label == T_label]
         T_info[T_label] = T_indices
 
-    zeolite.info["T_info"] = T_info
     return T_info
 
 

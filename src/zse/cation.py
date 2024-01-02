@@ -137,11 +137,5 @@ def monovalent(atoms, index, symbol, included_rings=None, path=None, bvect=None)
         path,
         bvect,
     )
-    for atoms in traj:
-        if "cations" not in atoms.info:
-            atoms.info["cations"] = {"indices": [], "symbols": [], "rings": []}
-        atoms.info["cations"]["indices"].append(len(atoms) - 1)
-        atoms.info["cations"]["symbols"].append(symbol)
-        atoms.info["cations"]["rings"] = locations[i]
 
     return traj, locations
