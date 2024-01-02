@@ -43,6 +43,8 @@ def get_T_info(
             if label == T_label and i not in ignored_T_indices
         ]
         T_info[T_label] = T_indices
+
+    zeolite.info["T_info"] = T_info
     return T_info
 
 
