@@ -150,7 +150,8 @@ def make_with_ratio(
                     [atom for atom in zeolite if atom.symbol == heteroatom]
                 )
 
-            zeolites.append(zeolite)
+            if zeolite not in zeolites:
+                zeolites.append(zeolite)
             pbar.update(1)
 
     if deduplicate:

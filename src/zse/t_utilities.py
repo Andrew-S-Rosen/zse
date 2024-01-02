@@ -21,9 +21,20 @@ def get_ratio(atoms: Atoms, heteroatom: str = "Al") -> float:
     return n_Si / n_heteroatom
 
 
-def get_T_info(
-    zeolite: Atoms, code: str, ignored_T_indices: list[int] = None
-) -> dict[str, list[int]]:
+def get_min_heteroatom_distance(atoms: Atoms, heteroatom: str = "Al") -> float:
+    """
+    Get the minimum distance between all heteroatom pairs in a zeolite, e.g.
+    to find the minimum Al-Al distance (if heteroatom = "Al")
+    """
+    heteroatom_sites = [atom.index for atom in atoms if atom.symbol == heteroatom]
+    if len(heteroatom_sites) > 1:
+        heteroatom_positions = atoms[heteroatom_sites].get_all_distances(mic=True)
+        return np.min(heteroatom_positions[heteroatom_positions != 0])
+    else:
+        return np.inf
+
+
+def get_T_info(zeolite: Atoms, code: str) -> dict[str, list[int]]:
     """
     Get T-site info for a zeolite. Returns a dictionary of the form
     {"T1": [0, 1], "T2": [1, 2], ...} where the keys are the T-site labels and the values
