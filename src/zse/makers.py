@@ -148,7 +148,7 @@ def make_with_ratio(
         min_cation_distance = 0.0
 
     zeolites = []
-    with tqdm(total=max_samples, desc="Generating zeolites:", unit="item") as pbar:
+    with tqdm(total=max_samples, desc="Generating zeolites", unit="item") as pbar:
         while len(zeolites) < max_samples:
             zeolite = deepcopy(iza_zeolite)
             bad_zeolite = False
