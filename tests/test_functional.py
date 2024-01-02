@@ -52,6 +52,6 @@ def test_make_with_ratio2():
         max_samples=2,
         deduplicate=False,
         min_heteroatom_distance=None,
-        min_cation_distance=None,
+        min_interatomic_distance=None,
     )
     assert len(exchanged_zeolites) == 2

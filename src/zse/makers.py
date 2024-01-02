@@ -91,8 +91,8 @@ def make_with_ratio(
     heteroatom: str = "Al",
     cation: str | None = None,
     max_samples: int = 50,
-    min_cation_distance: float | None = 1.5,
     min_heteroatom_distance: float | None = 3.5,
+    min_interatomic_distance: float | None = 1.5,
     deduplicate: bool = True,
 ) -> list[Atoms]:
     """
@@ -124,14 +124,14 @@ def make_with_ratio(
         Cation to charge balance with, by default None
     max_samples : int, optional
         Maximum number of zeolites to generate, by default 50
-    min_cation_distance : float, optional
-        Minimum allowable interatomic distance between the placed cation
-        and any other atom, by default 1.5 A. This is used to prevent
-        clashing.
     min_heteroatom_distance : float, optional
         Minimum allowable distance between heteroatoms, by default 3.5 A.
         This can be used to prevent Al-O-Al bridges. Set to `None` if
         heteroatom-O-heteroatom bridges are not an issue.
+    min_interatomic_distance : float, optional
+        Minimum allowable interatomic distance between any pair of atoms,
+        by default 1.5 A. This is useful to prevent cations from being too
+        close to one another.
     deduplicate : bool, optional
         Whether to remove duplicate zeolites at the end, by default True
 
@@ -186,11 +186,12 @@ def make_with_ratio(
                 if cation:
                     # Get charge-balanced zeolites with the cation at various adsorption sites
                     balanced_zeolites, _ = monovalent(
-                        zeolite, T_index, cation, cutoff=min_cation_distance
+                        zeolite, T_index, cation, cutoff=min_interatomic_distance
                     )
                     if not balanced_zeolites:
                         warnings.warn(
-                            "Stopping early. No valid adsorption sites left for cation."
+                            "Stopping early. No valid adsorption sites left for cation,"
+                            "at least for this distribution of heteroatoms."
                         )
                         return (
                             get_unique_structures(zeolites) if deduplicate else zeolites
