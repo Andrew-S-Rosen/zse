@@ -85,18 +85,28 @@ def get_T_info_exchangeable(
 
     T_info_copy = deepcopy(T_info)
     for T_label, T_indices in T_info.items():
+        remove_indices = []
         for T_index in T_indices:
             heteroatom_indices = [
                 atom.index
                 for atom in zeolite
                 if atom.symbol == heteroatom and atom.index != T_index
             ]
-            if not heteroatom_indices:
+            if zeolite[T_index].symbol == heteroatom:
+                # This T site is already the heteroatom. Remove it from consideration.
+                remove_indices.append(T_index)
+            elif not heteroatom_indices:
+                # No other heteroatoms to compare to. We're fine.
                 continue
-            dist_mat = zeolite.get_distances(T_index, heteroatom_indices, mic=True)
-            d_min = np.min(dist_mat)
-            if zeolite[T_index].symbol == heteroatom or d_min < min_heteroatom_distance:
-                T_info_copy[T_label].remove(T_index)
+            elif (
+                np.min(zeolite.get_distances(T_index, heteroatom_indices, mic=True))
+                < min_heteroatom_distance
+            ):
+                # This T site is too close to another heteroatom. Remove it from consideration.
+                remove_indices.append(T_index)
+        T_info_copy[T_label] = [
+            T_index for T_index in T_indices if T_index not in remove_indices
+        ]
         if not T_info_copy[T_label]:
             del T_info_copy[T_label]
     return T_info_copy
