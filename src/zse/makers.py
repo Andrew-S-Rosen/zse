@@ -136,7 +136,7 @@ def make_with_ratio(
     n_heteroatoms_target = round(n_Si / ratio)
 
     zeolites = []
-    with tqdm(total=max_samples, desc="Processing", unit="item") as pbar:
+    with tqdm(total=max_samples, desc="Generating zeolites:", unit="item") as pbar:
         while len(zeolites) < max_samples:
             zeolite = deepcopy(iza_zeolite)
             n_heteroatoms = 0
