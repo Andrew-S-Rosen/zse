@@ -90,7 +90,7 @@ def make_with_ratio(
     heteroatom: str = "Al",
     cation: str | None = None,
     max_samples: int = 50,
-    min_cation_distance: float | None = 1.5,
+    min_cation_distance: float | None = 2.0,
     min_heteroatom_distance: float | None = 3.5,
     deduplicate: bool = True,
 ) -> list[Atoms]:
