@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import warnings
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
@@ -159,8 +160,6 @@ def make_with_ratio(
         # Generate zeolites until we have enough
         while len(zeolites) < max_samples:
             zeolite = deepcopy(iza_zeolite)
-            bad_zeolite = False
-
             # Add heteroatoms until we reach the target ratio
             for _ in range(n_heteroatoms_target):
                 # Get only the valid T sites to consider for exchange
@@ -171,8 +170,8 @@ def make_with_ratio(
                     min_heteroatom_distance=min_heteroatom_distance,
                 )
                 if not T_info_valid:
-                    bad_zeolite = True
-                    break
+                    warnings.warn("Stopping early. No T sites left to exchange.")
+                    return get_unique_structures(zeolites) if deduplicate else zeolites
 
                 # Pick a random T site label and get the corresponding indices
                 _, T_indices = random.choice(list(T_info_valid.items()))
@@ -190,14 +189,18 @@ def make_with_ratio(
                         zeolite, T_index, cation, cutoff=min_cation_distance
                     )
                     if not balanced_zeolites:
-                        bad_zeolite = True
-                        break
+                        warnings.warn(
+                            "Stopping early. No valid adsorption sites left for cation."
+                        )
+                        return (
+                            get_unique_structures(zeolites) if deduplicate else zeolites
+                        )
 
                     # Pick a random charge-balanced zeolite
                     zeolite = random.choice(balanced_zeolites)
 
             # Add the zeolite to the list
-            if not bad_zeolite and zeolite not in zeolites:
+            if zeolite not in zeolites:
                 zeolites.append(zeolite)
                 pbar.update(1)
 
