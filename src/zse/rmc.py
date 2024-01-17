@@ -8,16 +8,23 @@ from typing import TYPE_CHECKING
 import numpy as np
 from ase import Atoms
 
-from zse.rmc_utilities import is_non_lowenstein, make_ratio_randomized
+from zse.rmc_utilities import (
+    clean_zeolite,
+    get_kth_neighbors,
+    is_non_lowenstein,
+    make_graph,
+    make_ratio_randomized,
+)
 
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
+    from networkx import Graph
 
 
 def calculate_alpha(
     atoms: Atoms,
     heteroatom: str = "Al",
-    distance_matrix: NDArray | None = None,
+    j: int = 2,
+    graph: Graph | None = None,
 ) -> float:
     """
     Given a zeolite, calculate the Warren-Cowley parameter, defined as follows:
@@ -25,12 +32,10 @@ def calculate_alpha(
     alpha_j = 1 - P_{j}/x_Si
 
     where P_j is the probability that a heteroatom is surrounded by a Si atom
-    in the j-th coordination shell, and x_Si is the Si:heteroatom fraction.
+    in the j-th coordination shell, and x_Si is the fraction of Si to heteroatom.
 
-    A value of 0 indicates a random distribution of heteroatoms, while a value
-    of 1 indicates clustering. A negative value indicates sparsity.
-
-    Here, we have chosen to set j = 2 per the convention in the literature.
+    A value of 0 for alpha_j indicates a random distribution of heteroatoms,
+    while a value of 1 indicates clustering. A negative value indicates sparsity.
 
     Reference:
     - https://pubs.acs.org/doi/10.1021/acs.jpcc.8b03475
@@ -41,21 +46,22 @@ def calculate_alpha(
         The zeolite to analyze.
     heteroatom : str, optional
         The symbol of the heteroatom, by default "Al".
-    distance_matrix : NDArray, optional
-        A precomputed distance matrix, by default None.
+    j : int
+        The coordination shell to consider, by default 2.
+        In the context of zeolites, we only consider T sites in the graph,
+        so T1 and T2 in -T1-O-T2- are j = 1 apart, -T1-O-T-O-T2- are j = 2 apart,
+        and so on.
+    graph : nx.Graph, optional
+        The graph representation of the structure, by default None.
+        If None, one will be generated.
 
     Returns
     -------
     float
         The Warren-Cowley parameter.
     """
-    atoms = atoms.copy()
-
-    # Strip off any cations and such. We are only interested in Si and the heteroatom,
-    # as well as O to define the coordination shells.
-    del atoms[
-        [atom.index for atom in atoms if atom.symbol not in ["Si", heteroatom, "O"]]
-    ]
+    atoms = clean_zeolite(atoms, allowed_elements=["Si", "O", heteroatom])
+    graph = graph if graph is not None else make_graph(atoms)
 
     heteroatom_indices = [atom.index for atom in atoms if atom.symbol == heteroatom]
     if len(heteroatom_indices) == 0:
@@ -66,35 +72,18 @@ def calculate_alpha(
     Si_indices = [atom.index for atom in atoms if atom.symbol == "Si"]
     T_indices = Si_indices + heteroatom_indices
     x_Si = len(Si_indices) / len(T_indices)
-    distance_matrix = (
-        distance_matrix
-        if distance_matrix is not None
-        else atoms.get_all_distances(mic=True)
-    )
 
     count = 0
     total = 0
     for heteroatom_index in heteroatom_indices:
-        # Here, we use the fact that each T site must have four O neighbors
-        distances = distance_matrix[heteroatom_index, :].copy()
-        distances[heteroatom_index] = np.inf
-        O_neighbor_indices = np.argsort(distances)[:4]
-
-        T_neighbors = []
-        for O_neighbor_index in O_neighbor_indices:
-            # Here, we use the fact that each O site must be bound to only
-            # two T sites, one of which was already counted above
-            distances = distance_matrix[O_neighbor_index, :].copy()
-            distances[heteroatom_index] = np.inf
-            distances[O_neighbor_index] = np.inf
-            T_neighbor = np.argsort(distances)[0]
-            T_neighbors.append(T_neighbor)
-
+        indices_in_shell = get_kth_neighbors(graph, heteroatom_index, j * 2)
         Si_in_second_shell = [
-            index for index in T_neighbors if atoms[index].symbol == "Si"
+            index_in_shell
+            for index_in_shell in indices_in_shell
+            if atoms[index_in_shell].symbol == "Si"
         ]
         count += len(Si_in_second_shell)
-        total += len(T_neighbors)
+        total += len(indices_in_shell)
 
     P_j = count / total
 
@@ -104,13 +93,13 @@ def calculate_alpha(
 def rmc_simulation(
     atoms: Atoms,
     heteroatom: str = "Al",
-    enforce_lowenstein: bool = True,
     beta: float = 0.005,
-    max_steps: int = 100000,
+    max_steps: int = 10000,
     stop_tol: float = 0.01,
-    alpha_target: float | None = -1.0,
-    minimize_alpha: bool = False,
+    minimize_alpha: bool = True,
     maximize_alpha: bool = False,
+    alpha_target: float | None = None,
+    enforce_lowenstein: bool = True,
     verbose: bool = True,
 ) -> tuple[Atoms, float]:
     """
@@ -127,8 +116,6 @@ def rmc_simulation(
         The zeolite to modify.
     heteroatom : str, optional
         The symbol of the heteroatom, by default "Al".
-    enforce_lowenstein : bool, optional
-        Whether to enforce the Lowenstein rule, by default True.
     beta : float, optional
         The inverse RMC temperature, by default 0.005. Larger values
         will decrease the likelihood of accepting a move that shifts
@@ -139,9 +126,6 @@ def rmc_simulation(
         The tolerance for the Warren-Cowley parameter, by default 0.01.
         If the difference between the current and target values is less
         than this, the simulation will stop.
-    alpha_target : float, optional
-        The target Warren-Cowley parameter, by default -1.0. If minimize_alpha
-        or maximize_alpha is True, this value will be ignored.
     minimize_alpha : bool, optional
         Whether to minimize the Warren-Cowley parameter, by default False.
         This is equivalent to setting alpha_target = -1.0 but will also return
@@ -152,6 +136,11 @@ def rmc_simulation(
         This is equivalent to setting alpha_target = 1.0 but will also return
         the structure that maximizes alpha rather than the last structure
         generated.
+    alpha_target : float, optional
+        The target Warren-Cowley parameter, by default -1.0. If minimize_alpha
+        or maximize_alpha is True, this value will be ignored.
+    enforce_lowenstein : bool, optional
+        Whether to enforce the Lowenstein rule, by default True.
     verbose : bool, optional
         Whether to print the current value of alpha at each step, by default False.
         Formatted as (step, alpha).
@@ -176,7 +165,6 @@ def rmc_simulation(
         )
         return proposed_atoms, swap_indices
 
-    current_atoms = atoms.copy()
     if minimize_alpha and maximize_alpha:
         raise ValueError("Must specify one of minimize_alpha, maximize_alpha.")
     elif minimize_alpha:
@@ -184,12 +172,17 @@ def rmc_simulation(
     elif maximize_alpha:
         alpha_target = 1.0
 
+    current_atoms = make_ratio_randomized(
+        atoms, heteroatom=heteroatom, enforce_lowenstein=enforce_lowenstein
+    )
+
     T_indices = [atom.index for atom in atoms if atom.symbol in ["Si", heteroatom]]
-    distance_matrix = current_atoms.get_all_distances(mic=True)
+    graph = make_graph(atoms)
     current_alpha = calculate_alpha(
         current_atoms,
         heteroatom=heteroatom,
-        distance_matrix=distance_matrix,
+        j=2,
+        graph=graph,
     )
 
     stored_atoms = []
@@ -206,13 +199,13 @@ def rmc_simulation(
             while is_non_lowenstein(
                 proposed_atoms,
                 heteroatom=heteroatom,
-                distance_matrix=distance_matrix,
+                graph=graph,
             ):
                 proposed_atoms, _ = _random_swap(current_atoms, T_indices)
 
         # Calculate alpha for the proposed structure
         proposed_alpha = calculate_alpha(
-            proposed_atoms, heteroatom=heteroatom, distance_matrix=distance_matrix
+            proposed_atoms, heteroatom=heteroatom, j=2, graph=graph
         )
 
         # Calculate acceptance probability
@@ -229,7 +222,7 @@ def rmc_simulation(
             stored_atoms.append(current_atoms)
             stored_alphas.append(current_alpha)
             if verbose:
-                print(i, current_alpha)
+                print(i, current_alpha, acceptance_prob)
 
     if minimize_alpha:
         min_alpha_index = np.argsort(stored_alphas)[0]

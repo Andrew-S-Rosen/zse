@@ -5,22 +5,76 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import networkx as nx
 import numpy as np
 from ase import Atoms
+from ase.neighborlist import build_neighbor_list
 
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
+    from networkx import Graph
+
+
+def clean_zeolite(atoms: Atoms, allowed_elements: list[str] = None) -> Atoms:
+    allowed_elements = (
+        allowed_elements if allowed_elements is not None else ["Si", "Al", "O"]
+    )
+    new_atoms = atoms.copy()
+    remove_indices = [
+        atom.index for atom in atoms if atom.symbol not in allowed_elements
+    ]
+    del new_atoms[remove_indices]
+    return new_atoms
+
+
+def make_graph(atoms: Atoms) -> Graph:
+    """
+    Make a networkX graph representation of an ASE Atoms object.
+
+    Parameters
+    ----------
+    atoms : Atoms
+        The structure to convert.
+
+    Returns
+    -------
+    nx.Graph
+        The graph representation of the structure.
+    """
+    nl = build_neighbor_list(atoms, self_interaction=False, bothways=True)
+    return nx.from_numpy_array(nl.get_connectivity_matrix())
+
+
+def get_kth_neighbors(graph: Graph, index: int, k: int) -> list[int]:
+    """
+    Get the indices of all atoms that are k bonds away from a given atom.
+
+    Parameters
+    ----------
+    graph : nx.Graph
+        The graph representation of the structure.
+    index : int
+        The index of the atom to check.
+    k : int
+        The number of bonds away to check.
+
+    Returns
+    -------
+    list[int]
+        The indices of all atoms that are k bonds away from the given atom.
+    """
+    node_distances = nx.single_source_shortest_path_length(graph, index, cutoff=k)
+    kth_neighbors = [node for node, distance in node_distances.items() if distance == k]
+    return kth_neighbors
 
 
 def is_non_lowenstein(
     atoms: Atoms,
     heteroatom: str = "Al",
-    d_cutoff: float = 3.5,
-    distance_matrix: NDArray | None = None,
+    graph: Graph | None = None,
 ) -> bool:
     """
-    Determines if a given structure is non-Lowenstein, defined as having
-    at least one heteroatom-heteroatom distance less than d_cutoff.
+    Determines if a given structure is non-Lowenstein, i.e. has
+    T-O-T sites where T is the heteroatom.
 
     Parameters
     ----------
@@ -28,10 +82,9 @@ def is_non_lowenstein(
         The structure to check.
     heteroatom : str, optional
         The symbol of the heteroatom, by default "Al".
-    d_cutoff : float, optional
-        The minimum allowable heteroatom-heteroatom distance, by default 3.5.
-    distance_matrix : NDArray, optional
-        A precomputed distance matrix, by default None.
+    graph
+        The graph representation of the structure, by default None.
+        If None, it will be computed.
 
     Returns
     -------
@@ -39,28 +92,26 @@ def is_non_lowenstein(
         True if the structure is non-Lowenstein, False otherwise.
     """
 
-    distance_matrix = (
-        distance_matrix
-        if distance_matrix is not None
-        else atoms.get_all_distances(mic=True)
-    )
+    graph = graph if graph is not None else make_graph(atoms)
 
     heteroatom_indices = [atom.index for atom in atoms if atom.symbol == heteroatom]
 
     for index in heteroatom_indices:
-        distances = distance_matrix[index, heteroatom_indices]
-        values_in_range = (distances > 0) & (distances < d_cutoff)
-        close_heteroatoms = np.sum(values_in_range)
-        if close_heteroatoms > 0:
+        indices_in_shell = get_kth_neighbors(graph, index, 2)
+        close_heteroatoms = [
+            index_in_shell
+            for index_in_shell in indices_in_shell
+            if atoms[index_in_shell].symbol == heteroatom
+        ]
+        if np.sum(close_heteroatoms) > 0:
             return True
     return False
 
 
 def make_ratio_randomized(
     atoms: Atoms,
-    ratio: float,
+    ratio: float | None = None,
     heteroatom: str = "Al",
-    d_cutoff: float = 3.5,
     enforce_lowenstein: bool = True,
 ) -> Atoms:
     """
@@ -72,11 +123,10 @@ def make_ratio_randomized(
     atoms : Atoms
         The zeolite to modify.
     ratio : float
-        The desired Si/heteroatom ratio.
+        The desired Si/heteroatom ratio. If None, use the current
+        ratio.
     heteroatom : str, optional
         The symbol of the heteroatom, by default "Al".
-    d_cutoff : float, optional
-        The minimum allowable heteroatom-heteroatom distance, by default 3.5.
     enforce_lowenstein : bool, optional
         Whether to enforce the Lowenstein rule, by default True.
 
@@ -96,6 +146,10 @@ def make_ratio_randomized(
 
     current_atoms = atoms.copy()
 
+    if ratio is None:
+        chemical_symbols = atoms.get_chemical_symbols()
+        ratio = chemical_symbols.count("Si") / chemical_symbols.count(heteroatom)
+
     # Start with an all-Si zeolite since we are going to randomize this
     for atom in current_atoms:
         if atom.symbol == heteroatom:
@@ -106,7 +160,7 @@ def make_ratio_randomized(
     n_to_exchange = round(len(Si_indices) / (1 + ratio))
 
     # Pre-compute this for later
-    distance_matrix = current_atoms.get_all_distances(mic=True)
+    graph = make_graph(current_atoms)
 
     # Randomly exchange Si atoms with heteroatoms
     for _ in range(n_to_exchange):
@@ -116,12 +170,7 @@ def make_ratio_randomized(
 
         # Check that the resulting structure is Lowenstein
         if enforce_lowenstein:
-            while is_non_lowenstein(
-                proposed_atoms,
-                heteroatom=heteroatom,
-                d_cutoff=d_cutoff,
-                precomputed_distance_matrix=distance_matrix,
-            ):
+            while is_non_lowenstein(proposed_atoms, heteroatom=heteroatom, graph=graph):
                 Si_indices.remove(swap_index)
                 if len(Si_indices) == 0:
                     raise ValueError("This zeolite cannot be made Lowenstein")
