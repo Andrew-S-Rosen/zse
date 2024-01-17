@@ -100,6 +100,7 @@ def rmc_simulation(
     maximize_alpha: bool = False,
     alpha_target: float | None = None,
     enforce_lowenstein: bool = True,
+    j: int = 2,
     verbose: bool = True,
 ) -> tuple[Atoms, float]:
     """
@@ -141,6 +142,8 @@ def rmc_simulation(
         or maximize_alpha is True, this value will be ignored.
     enforce_lowenstein : bool, optional
         Whether to enforce the Lowenstein rule, by default True.
+    j : int, optional
+        The coordination shell to consider in alpha_j, by default 2.
     verbose : bool, optional
         Whether to print the current value of alpha at each step, by default False.
         Formatted as (step, alpha).
@@ -181,7 +184,7 @@ def rmc_simulation(
     current_alpha = calculate_alpha(
         current_atoms,
         heteroatom=heteroatom,
-        j=2,
+        j=j,
         graph=graph,
     )
 
@@ -205,7 +208,7 @@ def rmc_simulation(
 
         # Calculate alpha for the proposed structure
         proposed_alpha = calculate_alpha(
-            proposed_atoms, heteroatom=heteroatom, j=2, graph=graph
+            proposed_atoms, heteroatom=heteroatom, j=j, graph=graph
         )
 
         # Calculate acceptance probability
