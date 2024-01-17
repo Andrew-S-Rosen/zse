@@ -92,7 +92,7 @@ def calculate_alpha(
 def rmc_simulation(
     atoms: Atoms,
     heteroatom: str = "Al",
-    beta: float = 0.005,
+    beta: float = 100.0,
     max_steps: int = 100000,
     stop_tol: float = 0.01,
     alpha_target: float = -1.0,
@@ -169,8 +169,7 @@ def rmc_simulation(
         graph=graph,
     )
 
-    stored_atoms = []
-    stored_alphas = []
+    dE_min = np.inf
     for i in range(max_steps):
         dE_current = np.abs(current_alpha - alpha_target)
         if dE_current < stop_tol:
@@ -200,12 +199,12 @@ def rmc_simulation(
 
         # Accept or reject the move
         if acceptance_prob >= np.random.rand():
-            current_atoms = proposed_atoms
-            current_alpha = proposed_alpha
-            stored_atoms.append(current_atoms)
-            stored_alphas.append(current_alpha)
+            if dE_proposed < dE_min:
+                dE_min = dE_proposed
+                best_atoms = proposed_atoms.copy()
+                best_alpha = proposed_alpha
             if verbose:
                 print(i, current_alpha)
-
-    closest_alpha_index = np.argsort(np.abs(np.array(stored_alphas) - alpha_target))[0]
-    return stored_atoms[closest_alpha_index], stored_alphas[closest_alpha_index]
+            current_atoms = proposed_atoms
+            current_alpha = proposed_alpha
+    return best_atoms, best_alpha
