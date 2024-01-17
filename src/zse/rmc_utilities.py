@@ -15,10 +15,26 @@ if TYPE_CHECKING:
 
 
 def clean_zeolite(atoms: Atoms, allowed_elements: list[str] = None) -> Atoms:
+    """
+    Clean a zeolite such that it consists only of `allowed_elements`.
+
+    Parameters
+    ----------
+    atoms : Atoms
+        The zeolite to clean.
+    allowed_elements : list[str], optional
+        The elements to keep, by default None.
+        If None, only Si, Al, and O are kept.
+
+    Returns
+    -------
+    Atoms
+        The cleaned zeolite.
+    """
+    new_atoms = atoms.copy()
     allowed_elements = (
         allowed_elements if allowed_elements is not None else ["Si", "Al", "O"]
     )
-    new_atoms = atoms.copy()
     remove_indices = [
         atom.index for atom in atoms if atom.symbol not in allowed_elements
     ]
@@ -139,8 +155,8 @@ def make_ratio_randomized(
     def _random_swap(
         atoms: Atoms, Si_indices: list[int], heteroatom: str = "Al"
     ) -> Atoms:
-        swap_index = np.random.choice(Si_indices)
         proposed_atoms = atoms.copy()
+        swap_index = np.random.choice(Si_indices)
         proposed_atoms[swap_index].symbol = heteroatom
         return proposed_atoms, swap_index
 

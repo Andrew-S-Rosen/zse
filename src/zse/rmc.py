@@ -9,7 +9,6 @@ import numpy as np
 from ase import Atoms
 
 from zse.rmc_utilities import (
-    clean_zeolite,
     get_kth_neighbors,
     is_non_lowenstein,
     make_graph,
@@ -31,8 +30,8 @@ def calculate_alpha(
 
     alpha_j = 1 - P_{j}/x_Si
 
-    where P_j is the probability that a heteroatom is surrounded by a Si atom
-    in the j-th coordination shell, and x_Si is the fraction of Si to heteroatom.
+    where P_j is the probability of finding a Si atom as the j-th nearest neighbor
+    of a heteroatom, and x_Si is the fraction of Si to heteroatom.
 
     A value of 0 for alpha_j indicates a random distribution of heteroatoms,
     while a value of 1 indicates clustering. A negative value indicates sparsity.
@@ -60,7 +59,7 @@ def calculate_alpha(
     float
         The Warren-Cowley parameter.
     """
-    atoms = clean_zeolite(atoms, allowed_elements=["Si", "O", heteroatom])
+
     graph = graph if graph is not None else make_graph(atoms)
 
     heteroatom_indices = [atom.index for atom in atoms if atom.symbol == heteroatom]
@@ -94,11 +93,9 @@ def rmc_simulation(
     atoms: Atoms,
     heteroatom: str = "Al",
     beta: float = 0.005,
-    max_steps: int = 10000,
+    max_steps: int = 100000,
     stop_tol: float = 0.01,
-    minimize_alpha: bool = True,
-    maximize_alpha: bool = False,
-    alpha_target: float | None = None,
+    alpha_target: float = -1.0,
     enforce_lowenstein: bool = True,
     j: int = 2,
     verbose: bool = True,
@@ -127,19 +124,10 @@ def rmc_simulation(
         The tolerance for the Warren-Cowley parameter, by default 0.01.
         If the difference between the current and target values is less
         than this, the simulation will stop.
-    minimize_alpha : bool, optional
-        Whether to minimize the Warren-Cowley parameter, by default False.
-        This is equivalent to setting alpha_target = -1.0 but will also return
-        the structure that minimizes alpha rather than the last structure
-        generated.
-    maximize_alpha : bool, optional
-        Whether to maximize the Warren-Cowley parameter, by default False.
-        This is equivalent to setting alpha_target = 1.0 but will also return
-        the structure that maximizes alpha rather than the last structure
-        generated.
     alpha_target : float, optional
         The target Warren-Cowley parameter, by default -1.0. If minimize_alpha
-        or maximize_alpha is True, this value will be ignored.
+        or maximize_alpha is True, this value will be ignored. Takes a value
+        between -1 and 1.
     enforce_lowenstein : bool, optional
         Whether to enforce the Lowenstein rule, by default True.
     j : int, optional
@@ -156,9 +144,9 @@ def rmc_simulation(
         The Warren-Cowley parameter of the modified zeolite.
     """
 
-    def _random_swap(atoms: Atoms, T_indices: list[int]) -> list[int]:
-        swap_indices = np.random.choice(T_indices, size=2, replace=False)
+    def _random_swap(atoms: Atoms, T_indices: list[int]) -> tuple[Atoms, list[int]]:
         proposed_atoms = atoms.copy()
+        swap_indices = np.random.choice(T_indices, size=2, replace=False)
         (
             proposed_atoms[swap_indices[0]].symbol,
             proposed_atoms[swap_indices[1]].symbol,
@@ -167,13 +155,6 @@ def rmc_simulation(
             proposed_atoms[swap_indices[0]].symbol,
         )
         return proposed_atoms, swap_indices
-
-    if minimize_alpha and maximize_alpha:
-        raise ValueError("Must specify one of minimize_alpha, maximize_alpha.")
-    elif minimize_alpha:
-        alpha_target = -1.0
-    elif maximize_alpha:
-        alpha_target = 1.0
 
     current_atoms = make_ratio_randomized(
         atoms, heteroatom=heteroatom, enforce_lowenstein=enforce_lowenstein
@@ -218,20 +199,13 @@ def rmc_simulation(
         )
 
         # Accept or reject the move
-        rand = np.random.rand()
-        if rand < acceptance_prob:
+        if acceptance_prob >= np.random.rand():
             current_atoms = proposed_atoms
             current_alpha = proposed_alpha
             stored_atoms.append(current_atoms)
             stored_alphas.append(current_alpha)
             if verbose:
-                print(i, current_alpha, acceptance_prob)
+                print(i, current_alpha)
 
-    if minimize_alpha:
-        min_alpha_index = np.argsort(stored_alphas)[0]
-        return stored_atoms[min_alpha_index], stored_alphas[min_alpha_index]
-    elif maximize_alpha:
-        max_alpha_index = np.argsort(stored_alphas)[-1]
-        return stored_atoms[max_alpha_index], stored_alphas[max_alpha_index]
-    else:
-        return current_atoms, current_alpha
+    closest_alpha_index = np.argsort(np.abs(np.array(stored_alphas) - alpha_target))[0]
+    return stored_atoms[closest_alpha_index], stored_alphas[closest_alpha_index]
