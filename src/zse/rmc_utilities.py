@@ -57,7 +57,7 @@ def make_graph(atoms: Atoms) -> Graph:
         The graph representation of the structure.
     """
     nl = build_neighbor_list(atoms, self_interaction=False, bothways=True)
-    return nx.from_numpy_array(nl.get_connectivity_matrix(), parallel_edges=True)
+    return nx.from_numpy_array(nl.get_connectivity_matrix())
 
 
 def get_kth_neighbors(graph: Graph, index: int, k: int) -> list[int]:
