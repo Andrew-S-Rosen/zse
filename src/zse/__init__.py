@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from ase.atoms import Atoms
+
+logger = logging.getLogger(__name__)
 
 
 def atoms_as_dict(s: Atoms) -> dict[str, Any]:
@@ -28,3 +31,6 @@ def atoms_from_dict(d: dict[str, Any]) -> Atoms:
 # Make Atoms MSONable
 Atoms.as_dict = atoms_as_dict
 Atoms.from_dict = atoms_from_dict
+
+# Set log level
+logger.setLevel(logging.INFO)

@@ -3,6 +3,7 @@ This module contains functions for doing reverse Monte Carlo.
 """
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -17,6 +18,8 @@ from zse.rmc_utilities import (
 
 if TYPE_CHECKING:
     from networkx import Graph
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_alpha(
@@ -98,7 +101,6 @@ def rmc_simulation(
     alpha_target: float = -1.0,
     enforce_lowenstein: bool = True,
     j: int = 2,
-    verbose: bool = True,
 ) -> tuple[Atoms, float]:
     """
     Run an atomistic reverse Monte Carlo simulation to generate a zeolite with
@@ -132,9 +134,6 @@ def rmc_simulation(
         Whether to enforce the Lowenstein rule, by default True.
     j : int, optional
         The coordination shell to consider in alpha_j, by default 2.
-    verbose : bool, optional
-        Whether to print the current value of alpha at each step, by default False.
-        Formatted as (step, alpha).
 
     Returns
     -------
@@ -160,14 +159,21 @@ def rmc_simulation(
         atoms, heteroatom=heteroatom, enforce_lowenstein=enforce_lowenstein
     )
 
-    T_indices = [atom.index for atom in atoms if atom.symbol in ["Si", heteroatom]]
-    graph = make_graph(atoms)
+    T_indices = [
+        atom.index for atom in current_atoms if atom.symbol in ["Si", heteroatom]
+    ]
+    graph = make_graph(current_atoms)
     current_alpha = calculate_alpha(
         current_atoms,
         heteroatom=heteroatom,
         j=j,
         graph=graph,
     )
+    logger.info(f"Initial alpha: {current_alpha}")
+
+    lower_bound_alpha = -atoms.get_chemical_symbols().count(heteroatom) / len(T_indices)
+    if alpha_target < lower_bound_alpha:
+        logger.warning(f"The minimum possible value for alpha is {lower_bound_alpha}.")
 
     dE_min = np.inf
     for i in range(max_steps):
@@ -203,8 +209,7 @@ def rmc_simulation(
                 dE_min = dE_proposed
                 best_atoms = proposed_atoms.copy()
                 best_alpha = proposed_alpha
-            if verbose:
-                print(i, current_alpha)
+            logger.info(f"Step {i}; alpha = {current_alpha}")
             current_atoms = proposed_atoms
             current_alpha = proposed_alpha
     return best_atoms, best_alpha
