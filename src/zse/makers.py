@@ -112,6 +112,10 @@ def make_with_ratio(
     Limitations:
     - Only supports monovalent cations currently.
 
+    Notes:
+    - Because of Steps 2 and 3, it is not fully random. If you want a truly random distribution,
+    use `zse.rmc_utilities.make_ratio_randomized` instead.
+
     Parameters
     ----------
     code : str
