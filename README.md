@@ -6,7 +6,10 @@
 
 The Zeolite Simulation Environment (ZSE) is a package to automate zeolite structure generation and characterization for computational chemistry.
 
-This is a fork of the [original ZSE package](https://github.com/jtcrum/zse) by Jerry T. Crum and Justin R. Crum.
+This is a fork of the [original ZSE package](https://github.com/jtcrum/zse) by Jerry T. Crum and Justin R. Crum. My contributions were the following modules as well as general cleanup:
+- `maker.py`
+- `rmc.py` and `rmc_utilities.py`
+
 
 ## Installation
 
